@@ -1,0 +1,33 @@
+[project]
+name = "hydra-ablation-sweeper"
+version = "0.1.0"
+description = "A Hydra sweeper for automated one-at-a-time ablation studies with cartesian product support for specific parameters."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "hydra-core>=1.1.0",
+]
+
+[tool.setuptools]
+packages = { find = { where = ["."], include = ["hydra_plugins.*"] } }
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
