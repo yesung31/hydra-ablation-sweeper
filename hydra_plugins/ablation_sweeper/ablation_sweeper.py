@@ -1,8 +1,9 @@
 import itertools
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from hydra.core.config_store import ConfigStore
 from hydra.core.override_parser.overrides_parser import OverridesParser
@@ -111,7 +112,8 @@ class AblationSweeper(Sweeper):
         ablation_sweep_elements: dict[str, list[str]] = {}
         fixed_elements: list[str] = []
 
-        # We need to know which keys are in the sweep to properly deduplicate against base config
+        # We need to know which keys are in the sweep to properly deduplicate against
+        # base config
         sweep_keys = set()
 
         for override in overrides:
@@ -136,8 +138,8 @@ class AblationSweeper(Sweeper):
                 # Fixed elements are also effectively swept to a single value
                 sweep_keys.add(key)
 
-        # To deduplicate against base config, we need to know the values in the base config
-        # for all keys we are touching.
+        # To deduplicate against base config, we need to know the values in the base
+        # config for all keys we are touching.
         base_config_values = {}
         if self.config:
             for key in sweep_keys:
@@ -172,7 +174,8 @@ class AblationSweeper(Sweeper):
                 for cp in cartesian_products:
                     all_jobs.append(cp + fixed_elements + [val])
 
-        # Remove potential duplicates by evaluating what the final config would look like for these keys
+        # Remove potential duplicates by evaluating what the final config would look
+        # like for these keys
         unique_jobs = []
         seen_configs = set()
 
@@ -184,7 +187,8 @@ class AblationSweeper(Sweeper):
                 current_job_values[k] = v
 
             # Create a stable representation for deduplication
-            # Include all keys that are present in either any job or base config for those keys
+            # Include all keys that are present in either any job or base config for
+            # those keys
             config_identity = []
             for k in sorted(current_job_values.keys()):
                 config_identity.append((k, current_job_values[k]))
