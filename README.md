@@ -2,18 +2,6 @@
 
 A Hydra sweeper for automated one-at-a-time ablation studies. It allows you to sweep over multiple parameters by varying one at a time from a base configuration, while optionally performing a cartesian product for specific parameters (like `seed`).
 
-## Installation
-
-```bash
-pip install .
-```
-
-Or for development:
-
-```bash
-pip install -e .
-```
-
 ## Usage
 
 In your Hydra configuration, select the `ablation` sweeper:
@@ -42,7 +30,7 @@ If the base configuration has `a=1` and `b=10`, the sweeper will generate:
 - `(a=1, b=20, seed=0)`
 - `(a=1, b=20, seed=1)`
 
-Instead of the full cartesian product ($3 	imes 2 	imes 2 = 12$ jobs), it only generates the necessary ablation runs ($1 	imes 2 + 2 	imes 2 + 1 	imes 2 = 8$ unique jobs).
+Instead of the full cartesian product ($3\times 2\times 2 = 12$ jobs), it only generates the necessary ablation runs ($1\times 2 + 2\times 2 + 1\times 2 = 8$ unique jobs).
 
 ### Why use this?
 
