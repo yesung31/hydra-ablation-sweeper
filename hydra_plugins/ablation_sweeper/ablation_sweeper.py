@@ -1,11 +1,8 @@
 import itertools
 import logging
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
-
-from omegaconf import DictConfig, OmegaConf
+from typing import Any, Sequence
 
 from hydra.core.config_store import ConfigStore
 from hydra.core.override_parser.overrides_parser import OverridesParser
@@ -14,15 +11,18 @@ from hydra.core.utils import JobReturn
 from hydra.plugins.launcher import Launcher
 from hydra.plugins.sweeper import Sweeper
 from hydra.types import HydraContext, TaskFunction
+from omegaconf import DictConfig, OmegaConf
 
 log = logging.getLogger(__name__)
+
 
 @dataclass
 class AblationSweeperConf:
     _target_: str = "hydra_plugins.ablation_sweeper.ablation_sweeper.AblationSweeper"
-    params: Optional[Dict[str, Any]] = None
-    cartesian_params: Optional[List[str]] = None
-    max_batch_size: Optional[int] = None
+    params: dict[str, Any] | None = None
+    cartesian_params: list[str] | None = None
+    max_batch_size: int | None = None
+
 
 ConfigStore.instance().store(
     group="hydra/sweeper",
@@ -31,22 +31,23 @@ ConfigStore.instance().store(
     provider="ablation_sweeper",
 )
 
+
 class AblationSweeper(Sweeper):
     def __init__(
         self,
-        params: Optional[Dict[str, Any]],
-        cartesian_params: Optional[List[str]] = None,
-        max_batch_size: Optional[int] = None,
+        params: dict[str, Any] | None,
+        cartesian_params: list[str] | None = None,
+        max_batch_size: int | None = None,
     ):
         super().__init__()
         self.params = params or {}
         self.cartesian_params = cartesian_params or []
         self.max_batch_size = max_batch_size
-        
-        self.hydra_context: Optional[HydraContext] = None
-        self.config: Optional[DictConfig] = None
-        self.launcher: Optional[Launcher] = None
-        self.overrides: Optional[List[List[List[str]]]] = None
+
+        self.hydra_context: HydraContext | None = None
+        self.config: DictConfig | None = None
+        self.launcher: Launcher | None = None
+        self.overrides: list[list[list[str]]] | None = None
         self.batch_index = 0
 
     def setup(
@@ -57,6 +58,7 @@ class AblationSweeper(Sweeper):
         config: DictConfig,
     ) -> None:
         from hydra.core.plugins import Plugins
+
         self.hydra_context = hydra_context
         self.config = config
         self.launcher = Plugins.instance().instantiate_launcher(
@@ -65,7 +67,7 @@ class AblationSweeper(Sweeper):
             config=config,
         )
 
-    def sweep(self, arguments: List[str]) -> Any:
+    def sweep(self, arguments: list[str]) -> Any:
         assert self.config is not None
         assert self.launcher is not None
         assert self.hydra_context is not None
@@ -81,34 +83,34 @@ class AblationSweeper(Sweeper):
 
         # Generate all combinations
         self.overrides = self._generate_overrides(overrides)
-        
+
         sweep_dir = Path(self.config.hydra.sweep.dir)
         sweep_dir.mkdir(parents=True, exist_ok=True)
         OmegaConf.save(self.config, sweep_dir / "multirun.yaml")
 
-        returns: List[Sequence[JobReturn]] = []
+        returns: list[Sequence[JobReturn]] = []
         initial_job_idx = 0
-        
+
         while self.batch_index < len(self.overrides):
             batch = self.overrides[self.batch_index]
             self.batch_index += 1
-            
+
             self.validate_batch_is_legal(batch)
             results = self.launcher.launch(batch, initial_job_idx=initial_job_idx)
-            
+
             for r in results:
                 _ = r.return_value
-            
+
             initial_job_idx += len(batch)
             returns.append(results)
-            
+
         return returns
 
-    def _generate_overrides(self, overrides: List[Override]) -> List[List[List[str]]]:
-        cartesian_elements: Dict[str, List[str]] = {}
-        ablation_sweep_elements: Dict[str, List[str]] = {}
-        fixed_elements: List[str] = []
-        
+    def _generate_overrides(self, overrides: list[Override]) -> list[list[list[str]]]:
+        cartesian_elements: dict[str, list[str]] = {}
+        ablation_sweep_elements: dict[str, list[str]] = {}
+        fixed_elements: list[str] = []
+
         # We need to know which keys are in the sweep to properly deduplicate against base config
         sweep_keys = set()
 
@@ -116,12 +118,18 @@ class AblationSweeper(Sweeper):
             key = override.get_key_element()
             if key in self.cartesian_params:
                 if override.is_sweep_override():
-                    cartesian_elements[key] = [f"{key}={val}" for val in override.sweep_string_iterator()]
+                    cartesian_elements[key] = [
+                        f"{key}={val}" for val in override.sweep_string_iterator()
+                    ]
                 else:
-                    cartesian_elements[key] = [f"{key}={override.get_value_element_as_str()}"]
+                    cartesian_elements[key] = [
+                        f"{key}={override.get_value_element_as_str()}"
+                    ]
                 sweep_keys.add(key)
             elif override.is_sweep_override():
-                ablation_sweep_elements[key] = [f"{key}={val}" for val in override.sweep_string_iterator()]
+                ablation_sweep_elements[key] = [
+                    f"{key}={val}" for val in override.sweep_string_iterator()
+                ]
                 sweep_keys.add(key)
             else:
                 fixed_elements.append(f"{key}={override.get_value_element_as_str()}")
@@ -145,11 +153,14 @@ class AblationSweeper(Sweeper):
         # Cartesian product of cartesian_params
         if cartesian_elements:
             keys = sorted(cartesian_elements.keys())
-            cartesian_products = [list(x) for x in itertools.product(*[cartesian_elements[k] for k in keys])]
+            cartesian_products = [
+                list(x)
+                for x in itertools.product(*[cartesian_elements[k] for k in keys])
+            ]
         else:
             cartesian_products = [[]]
 
-        all_jobs: List[List[str]] = []
+        all_jobs: list[list[str]] = []
 
         # 1. Base case: Cartesian products of cartesian_params + fixed_elements
         for cp in cartesian_products:
@@ -164,20 +175,20 @@ class AblationSweeper(Sweeper):
         # Remove potential duplicates by evaluating what the final config would look like for these keys
         unique_jobs = []
         seen_configs = set()
-        
+
         for job in all_jobs:
             # Merge job overrides and base config to find final values for this job
             current_job_values = base_config_values.copy()
             for override_str in job:
                 k, v = override_str.split("=", 1)
                 current_job_values[k] = v
-            
+
             # Create a stable representation for deduplication
             # Include all keys that are present in either any job or base config for those keys
             config_identity = []
             for k in sorted(current_job_values.keys()):
                 config_identity.append((k, current_job_values[k]))
-            
+
             config_identity_tuple = tuple(config_identity)
             if config_identity_tuple not in seen_configs:
                 seen_configs.add(config_identity_tuple)
@@ -186,4 +197,7 @@ class AblationSweeper(Sweeper):
         if self.max_batch_size is None or self.max_batch_size == -1:
             return [unique_jobs]
         else:
-            return [unique_jobs[i : i + self.max_batch_size] for i in range(0, len(unique_jobs), self.max_batch_size)]
+            return [
+                unique_jobs[i : i + self.max_batch_size]
+                for i in range(0, len(unique_jobs), self.max_batch_size)
+            ]
